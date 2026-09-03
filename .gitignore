@@ -1,0 +1,75 @@
+# ====================
+# Terraform
+# ====================
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*.backup
+*.tfstate.backup
+crash.log
+crash.*.log
+
+# ====================
+# Credentials & Secrets
+# ====================
+.env
+.env.*
+*.pem
+*.key
+*.crt
+secrets/
+credentials/
+*.tfvars          # Real tfvars with secrets — keep only *.tfvars.example
+
+# ====================
+# Python
+# ====================
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.mypy_cache/
+.ruff_cache/
+
+# ====================
+# IDE / Editor
+# ====================
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+.DS_Store
+Thumbs.db
+
+# ====================
+# OS / System
+# ====================
+.DS_Store
+.gitkeep
+
+# ====================
+# AWS CLI
+# ====================
+.aws/
+aws-credentials*
