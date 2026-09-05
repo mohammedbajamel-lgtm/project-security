@@ -62,14 +62,39 @@ The automated suite completed with **171 passed**, and total measured coverage r
 
 ## Evidence gallery
 
-| Control | Evidence |
+### Tests and infrastructure reconciliation
+
+| Automated test suite | Terraform drift check |
 |---|---|
-| Tests and infrastructure reconciliation | [Tests passed](docs/screenshots/tests-passed.png) · [Terraform no changes](docs/screenshots/terraform-no-changes.png) |
-| Incident data path | [Normalized findings](docs/screenshots/dynamodb-findings-overview.png) · [Correlated incident](docs/screenshots/correlated-incident.png) |
-| Orchestration and evidence | [Successful workflow](docs/screenshots/stepfunctions-workflow-success.png) · [Evidence package](docs/screenshots/s3-evidence-package.png) |
-| Safety and access control | [IAM roles](docs/screenshots/iam-lab-roles-redacted.png) · [Approval API](docs/screenshots/api-gateway-approval-resources.png) |
-| Operations | [Overview dashboard](docs/screenshots/cloudwatch-system-health.png) · [Security dashboard](docs/screenshots/cloudwatch-security.png) |
-| Resilience and cost | [DLQ monitoring](docs/screenshots/sqs-dlq-monitoring.png) · [Budget alerts](docs/screenshots/budget-alerts.png) |
+| <img src="docs/screenshots/tests-passed.png" alt="171 tests passed" width="520"> | <img src="docs/screenshots/terraform-no-changes.png" alt="Terraform reports no changes" width="520"> |
+
+### Incident data path
+
+| Normalized findings | Correlated incident |
+|---|---|
+| <img src="docs/screenshots/dynamodb-findings-overview.png" alt="Normalized findings in DynamoDB" width="520"> | <img src="docs/screenshots/correlated-incident.png" alt="Correlated incident in DynamoDB" width="520"> |
+
+### Orchestration and preserved evidence
+
+| Successful workflow | Evidence package |
+|---|---|
+| <img src="docs/screenshots/stepfunctions-workflow-success.png" alt="Successful Step Functions remediation" width="520"> | <img src="docs/screenshots/s3-evidence-package.png" alt="Preserved S3 evidence package" width="520"> |
+
+### Safety and access control
+
+| Scoped IAM roles | Authenticated approval API |
+|---|---|
+| <img src="docs/screenshots/iam-lab-roles-redacted.png" alt="Scoped IAM roles" width="520"> | <img src="docs/screenshots/api-gateway-approval-resources.png" alt="Approval API resources" width="520"> |
+
+### Operations, resilience, and cost
+
+| Platform health | Security outcomes |
+|---|---|
+| <img src="docs/screenshots/cloudwatch-system-health.png" alt="CloudWatch platform health" width="520"> | <img src="docs/screenshots/cloudwatch-security.png" alt="CloudWatch security outcomes" width="520"> |
+
+| Dead-letter monitoring | Budget guardrails |
+|---|---|
+| <img src="docs/screenshots/sqs-dlq-monitoring.png" alt="SQS dead-letter monitoring" width="520"> | <img src="docs/screenshots/budget-alerts.png" alt="AWS budget alert thresholds" width="520"> |
 
 See the complete, annotated [evidence gallery](docs/evidence.md). Screenshots are sanitized; account identifiers, resource IDs, endpoints, local paths, and private originals are excluded from version control.
 
