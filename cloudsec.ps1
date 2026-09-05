@@ -104,7 +104,7 @@ try {
     $destroyExitCode = $LASTEXITCODE
     $remainingResources = @(terraform -chdir=terraform state list)
     if ($destroyExitCode -ne 0 -or $remainingResources.Count -gt 0) {
-        Write-Warning "Terraform removed everything AWS currently permits, but $($remainingResources.Count) resource(s) remain in state—normally Object-Locked evidence and dependencies."
+        Write-Warning "Terraform removed everything AWS currently permits, but $($remainingResources.Count) resource(s) remain in state; normally Object-Locked evidence and dependencies."
         Write-Warning "The Terraform backend was preserved so these retained resources can be removed later. Rerun this same destroy command after retention expires."
         $remainingResources | ForEach-Object { Write-Host "  remaining: $_" }
         exit 2
