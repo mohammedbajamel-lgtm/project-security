@@ -4,7 +4,7 @@ Capture from a clean dev/demo deployment at 1920×1080 or higher. Before saving,
 
 | File | Reproduction step |
 |---|---|
-| `screenshots/architecture-diagram.png` | export `architecture-diagram.drawio` |
+| `architecture-diagram.png` | export `architecture-diagram.drawio` |
 | `terraform-deploy.png` | show successful isolated plan/apply summary, no identifiers |
 | `guardduty-finding.png` | open synthetic demo finding |
 | `eventbridge-event.png` | show normalized synthetic finding in DynamoDB |

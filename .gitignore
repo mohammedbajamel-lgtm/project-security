@@ -12,6 +12,7 @@ tfplan*
 *.plan.json
 terraform/plan.json
 terraform/plan.txt
+terraform/modules/telemetry-ingestion/telemetry-ingestion.zip
 **/*.tfvars
 **/backend.hcl
 .portfolio-private/
