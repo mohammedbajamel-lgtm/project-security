@@ -51,15 +51,23 @@ function Remove-BucketContents {
         $tempFile = Join-Path ([IO.Path]::GetTempPath()) ("cloudsec-delete-{0}.json" -f [guid]::NewGuid())
         try {
             [IO.File]::WriteAllText($tempFile, $payload, [Text.UTF8Encoding]::new($false))
-            $deleteRaw = aws s3api delete-objects --bucket $Bucket --delete "file://$tempFile" --bypass-governance-retention --output json
+            $deleteRaw = aws s3api delete-objects --bucket $Bucket --delete "file://$tempFile" --output json
             if ($LASTEXITCODE -ne 0) {
-                Write-Warning "AWS retention or permissions prevented deletion from $Bucket. Other resources will still be destroyed."
+                Write-Warning "AWS permissions prevented deletion from $Bucket. Other resources will still be destroyed."
                 return $false
             }
             $deleteResult = $deleteRaw | ConvertFrom-Json
             if (@($deleteResult.Errors).Count -gt 0) {
-                Write-Warning "AWS retention prevented one or more objects from being deleted from $Bucket. Other resources will still be destroyed."
-                return $false
+                $deleteRaw = aws s3api delete-objects --bucket $Bucket --delete "file://$tempFile" --bypass-governance-retention --output json
+                if ($LASTEXITCODE -ne 0) {
+                    Write-Warning "AWS retention or permissions prevented deletion from $Bucket. Other resources will still be destroyed."
+                    return $false
+                }
+                $deleteResult = $deleteRaw | ConvertFrom-Json
+                if (@($deleteResult.Errors).Count -gt 0) {
+                    Write-Warning "AWS retention prevented one or more objects from being deleted from $Bucket. Other resources will still be destroyed."
+                    return $false
+                }
             }
         }
         finally {
@@ -116,10 +124,10 @@ try {
         Invoke-Checked { terraform -chdir=terraform/backend init -reconfigure }
         $backendBucket = terraform -chdir=terraform/backend output -raw state_bucket_name
         if ($LASTEXITCODE -eq 0 -and $backendBucket) {
-            Remove-BucketContents $backendBucket.Trim()
+            $null = Remove-BucketContents $backendBucket.Trim()
             $backendVars = Join-Path $backendRoot "dev.tfvars"
             if (Test-Path -LiteralPath $backendVars) {
-                Invoke-Checked { terraform -chdir=terraform/backend destroy -auto-approve -var-file=dev.tfvars }
+                Invoke-Checked { & terraform '-chdir=terraform/backend' 'destroy' '-auto-approve' "-var-file=$backendVars" }
             } else {
                 Write-Warning "Main stack is destroyed, but backend tfvars are missing; backend bucket remains."
             }
