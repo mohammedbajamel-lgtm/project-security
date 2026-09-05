@@ -34,7 +34,10 @@ function Remove-BucketContents {
     Write-Host "Emptying Terraform-managed S3 bucket: $Bucket"
     while ($true) {
         $raw = aws s3api list-object-versions --bucket $Bucket --output json
-        if ($LASTEXITCODE -ne 0) { throw "Could not list objects in $Bucket." }
+        if ($LASTEXITCODE -ne 0) {
+            Write-Warning "Could not list objects in $Bucket; Terraform will attempt normal deletion."
+            return $false
+        }
         $listing = $raw | ConvertFrom-Json
         $objects = @()
         foreach ($version in @($listing.Versions)) {
@@ -49,14 +52,21 @@ function Remove-BucketContents {
         try {
             [IO.File]::WriteAllText($tempFile, $payload, [Text.UTF8Encoding]::new($false))
             $deleteRaw = aws s3api delete-objects --bucket $Bucket --delete "file://$tempFile" --bypass-governance-retention --output json
-            if ($LASTEXITCODE -ne 0) { throw "AWS retention or permissions prevented deletion from $Bucket." }
+            if ($LASTEXITCODE -ne 0) {
+                Write-Warning "AWS retention or permissions prevented deletion from $Bucket. Other resources will still be destroyed."
+                return $false
+            }
             $deleteResult = $deleteRaw | ConvertFrom-Json
-            if (@($deleteResult.Errors).Count -gt 0) { throw "AWS retention prevented one or more objects from being deleted from $Bucket." }
+            if (@($deleteResult.Errors).Count -gt 0) {
+                Write-Warning "AWS retention prevented one or more objects from being deleted from $Bucket. Other resources will still be destroyed."
+                return $false
+            }
         }
         finally {
             Remove-Item -LiteralPath $tempFile -Force -ErrorAction SilentlyContinue
         }
     }
+    return $true
 }
 
 foreach ($tool in @("terraform", "aws")) {
@@ -88,9 +98,17 @@ try {
     foreach ($address in $bucketAddresses) {
         $state = terraform -chdir=terraform state show -no-color $address
         $idLine = $state | Select-String -Pattern '^\s*id\s*=\s*"([^\"]+)"' | Select-Object -First 1
-        if ($idLine) { Remove-BucketContents $idLine.Matches[0].Groups[1].Value }
+        if ($idLine) { $null = Remove-BucketContents $idLine.Matches[0].Groups[1].Value }
     }
-    Invoke-Checked { terraform -chdir=terraform destroy -auto-approve -var-file="environments/$Environment/$Environment.tfvars" }
+    terraform -chdir=terraform destroy -auto-approve -var-file="environments/$Environment/$Environment.tfvars"
+    $destroyExitCode = $LASTEXITCODE
+    $remainingResources = @(terraform -chdir=terraform state list)
+    if ($destroyExitCode -ne 0 -or $remainingResources.Count -gt 0) {
+        Write-Warning "Terraform removed everything AWS currently permits, but $($remainingResources.Count) resource(s) remain in state—normally Object-Locked evidence and dependencies."
+        Write-Warning "The Terraform backend was preserved so these retained resources can be removed later. Rerun this same destroy command after retention expires."
+        $remainingResources | ForEach-Object { Write-Host "  remaining: $_" }
+        exit 2
+    }
 
     $backendState = Join-Path $backendRoot "terraform.tfstate"
     if (Test-Path -LiteralPath $backendState) {

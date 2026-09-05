@@ -138,7 +138,7 @@ After configuring `terraform/environments/lab/lab.tfvars` and `backend.hcl`, man
 .\cloudsec.ps1 destroy -ConfirmDestroy
 ```
 
-Both commands default to `lab`, verify the signed-in AWS account, initialize Terraform, and operate the complete root module. Destroy empties Terraform-managed S3 buckets where AWS retention permits and removes the remote-state backend last. KMS keys enter AWS's mandatory pending-deletion period rather than disappearing immediately.
+Both commands default to `lab`, verify the signed-in AWS account, initialize Terraform, and operate the complete root module. Destroy empties Terraform-managed S3 buckets where AWS retention permits and removes the remote-state backend last. If Object Lock retains evidence, all other permitted resources are still destroyed and the backend is preserved so the same command can finish cleanup after retention expires. KMS keys enter AWS's mandatory pending-deletion period rather than disappearing immediately.
 
 ## Safe quick start
 
