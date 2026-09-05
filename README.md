@@ -126,6 +126,20 @@ scripts/            deployment, verification, demo, and cleanup helpers
 docs/               architecture, security, evidence, and operations guides
 ```
 
+## One-command deployment and teardown
+
+After configuring `terraform/environments/lab/lab.tfvars` and `backend.hcl`, manage the complete lab through one launcher:
+
+```powershell
+# Deploy or update everything
+.\cloudsec.ps1 deploy
+
+# Destroy everything (permanent)
+.\cloudsec.ps1 destroy -ConfirmDestroy
+```
+
+Both commands default to `lab`, verify the signed-in AWS account, initialize Terraform, and operate the complete root module. Destroy empties Terraform-managed S3 buckets where AWS retention permits and removes the remote-state backend last. KMS keys enter AWS's mandatory pending-deletion period rather than disappearing immediately.
+
 ## Safe quick start
 
 1. Use dedicated Security, Workload, and Lab accounts. A strictly isolated `cloudsec-lab-*` namespace may be used for practice only.

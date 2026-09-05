@@ -292,7 +292,7 @@ module "dynamodb" {
   incident_key_arn = module.kms.incident_key_arn
   finding_key_arn  = module.kms.finding_key_arn
 
-  disable_deletion_protection = contains(["dev", "demo"], var.environment)
+  disable_deletion_protection = contains(["dev", "lab", "demo"], var.environment)
 
   tags = local.common_tags
 }
