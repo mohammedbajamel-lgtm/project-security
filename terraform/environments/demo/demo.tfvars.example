@@ -1,0 +1,12 @@
+environment          = "demo"
+region               = "us-east-1"
+security_account_id  = "REPLACE_WITH_DEDICATED_DEMO_ACCOUNT_ID"
+workload_account_id  = "REPLACE_WITH_DEDICATED_DEMO_ACCOUNT_ID"
+security_account_role_arn = "arn:aws:iam::REPLACE_WITH_DEDICATED_DEMO_ACCOUNT_ID:role/cloudsec-demo-terraform-deploy"
+workload_account_role_arn = "arn:aws:iam::REPLACE_WITH_DEDICATED_DEMO_ACCOUNT_ID:role/cloudsec-demo-terraform-deploy"
+allowed_terraform_principal_arn      = "arn:aws:iam::REPLACE_WITH_DEDICATED_DEMO_ACCOUNT_ID:role/CloudSecDemoOperator"
+allowed_security_admin_principal_arn = "arn:aws:iam::REPLACE_WITH_DEDICATED_DEMO_ACCOUNT_ID:role/CloudSecDemoOperator"
+enable_lab_environment = true
+cost_alert_email = null
+telemetry_reserved_concurrency = -1
+baseline_reserved_concurrency  = -1

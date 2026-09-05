@@ -1,0 +1,4 @@
+environment               = "dev"
+region                    = "us-east-1"
+cost_center               = "security"
+terraform_deploy_role_arn = "arn:aws:iam::123456789012:role/cloudsec-dev-terraform-deploy"

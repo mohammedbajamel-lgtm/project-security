@@ -82,30 +82,53 @@ flowchart TD
 
 ### Task T01-02: Configure Terraform Backend and State Locking
 
-**Objective:** Deploy a centralized Terraform backend using S3 and DynamoDB state locking in the Security Account.
+**Status:** COMPLETE (Stage 1 applied 2026-09-03 in the authorized AWS account, us-east-1; 6 resources created; all post-apply verifications passed; state lock mechanism tested)
 
-**Files/Components Affected:** 	erraform/backend/ (S3 bucket, DynamoDB table, bucket policy)
+**Stage 1 Apply Record:**
+- Bucket: redacted from the public repository
+- ARN: redacted from the public repository
+- Plan result: 6 added, 0 changed, 0 destroyed
+- Post-apply verification: bucket exists, versioning Enabled, default SSE AES256, all four Block Public Access flags true, bucket policy has exactly 2 Deny statements (DenyInsecureTransport + DenyUnencryptedUploads) with no Allow statements, 5 expected tags present, 0 unexpected objects, exactly one `cloudsec-dev-*` bucket in account
+- State lock test: backend init succeeds; two `terraform plan` calls acquired and released locks; `.tflock` objects cleaned up after each plan
+- Bootstrap local state preserved at `terraform/backend/terraform.tfstate` with backup at `terraform/backend/state-backups/terraform.tfstate.LATEST.backup` and `terraform/backend/state-backups/terraform.tfstate.<timestamp>.backup`
+- Dev backend config written to `terraform/environments/dev/backend.hcl`
+- Dev example tfvars written to `terraform/environments/dev/dev.tfvars.example`
+- Stage 2 (bucket-policy Allow + DenyStateObjectDeletion) remains pending T01-07
 
-**AWS Services Involved:** S3, DynamoDB, IAM
+**Objective:** Deploy a centralized Terraform backend using an S3 bucket with local-provider-lock-file state locking in the Security Account.
+
+**Files/Components Affected:** terraform/backend/ (S3 bucket, bucket policy, encryption, versioning; NO DynamoDB)
+
+**AWS Services Involved:** S3 only (Stage 1). IAM (T01-07) is needed for Stage 2 policy update.
+
+**Design Decisions (per user review):**
+- **TWO-STAGE BOOTSTRAP** resolves the T01-02 ↔ T01-07 dependency cycle. Stage 1 (T01-02) creates the bucket with versioning, SSE-S3, block-public-access, `force_destroy = false`, and ONLY security `Deny` statements (insecure-transport, unencrypted-uploads). No role-scoped `Allow` statements in Stage 1 — the deploy role does not yet exist. Stage 2 (post-T01-07) is a SEPARATE reviewed plan that adds the role-scoped `Allow` statements + `DenyStateObjectDeletion` once the real role is provisioned. No placeholder or nonexistent role ARN is ever written into a bucket policy.
+- **DynamoDB lock table REMOVED.** State locking uses the S3 backend's `use_lockfile = true` setting (Terraform v1.6+), which writes a transient `.tflock` object at `<state_key>.tflock` alongside the state file. No backward-compatibility need.
+- **`use_lockfile` vs `.terraform.lock.hcl`:** These are unrelated. `use_lockfile = true` is S3 state locking. `.terraform.lock.hcl` is the local provider-version pin file written by `terraform init`; it MUST be committed to Git.
+- **`force_destroy = false`** in all environments (dev/staging/prod). State buckets are critical; accidental deletion is intentionally disallowed.
+- **Account ID sourced from authenticated provider data** (`data.aws_caller_identity.current.account_id`) rather than trusted from tfvars. Region remains a variable (default `us-east-1`) because the provider cannot be initialized from a data source (cycle).
+- **Lock file permissions:** `s3:GetObject`/`s3:PutObject`/`s3:DeleteObject` on `terraform.tfstate.tflock` (role must be able to acquire and release the state lock). `s3:DeleteObject` is NOT granted on `terraform.tfstate` (state-object deletion guard).
 
 **Requirements Satisfied:** R2 (state management foundation)
 
 **Dependencies:** T01-01
 
-**Security Considerations:** S3 bucket must have versioning enabled, block public access, and encryption at rest (SSE-S3 minimum). DynamoDB table must use AWS-owned KMS key. Bucket policy must deny all non-Terraform access.
+**Security Considerations:** S3 bucket must have versioning enabled, block public access, and encryption at rest (SSE-S3 minimum). `force_destroy` must be `false` in all environments. Two-stage bootstrap: Stage 1 contains ONLY security `Deny` statements (no role-scoped `Allow`); Stage 2 (post-T01-07) adds role-scoped `Allow` statements. Never write a placeholder or nonexistent role ARN into a bucket policy. Preserve administrative recovery path via bucket ownership.
 
 **Acceptance Criteria:**
-1. S3 bucket created with versioning enabled, block-public-access-all set, SSE-S3 encryption
-2. DynamoDB table created with single partition key LockID (String), 5 WCU/5 RCU
-3. Bucket policy allows only the Terraform deploy role to write state
-4. Backend configuration documented in 	erraform/backend/README.md with copy-paste ackend {} block
-5. Terraform state file upload tested with 	erraform init -migrate-state
+1. S3 bucket created with versioning enabled, block-public-access-all set, SSE-S3 encryption, `force_destroy = false`
+2. Backend uses `use_lockfile = true` (S3 state lock via `<state_key>.tflock`); no DynamoDB lock table required. `use_lockfile` is S3 state locking and is unrelated to `.terraform.lock.hcl` (the local provider-version pin file, which must be committed to Git).
+3. Stage 1 bucket policy contains ONLY security `Deny` statements (insecure-transport, unencrypted-uploads); no role-scoped `Allow` statements in Stage 1
+4. Stage 2 (post-T01-07) adds: role-scoped `AllowListBucketForStateDiscovery` (prefix-condition), `AllowStateObjectReadWrite` (state key only), `AllowStateLockFileReadWrite` (`.tflock` key with GetObject/PutObject/DeleteObject), and `DenyStateObjectDeletion` on `terraform.tfstate` (NOT on `.tflock`). Deploy role ARN validated via regex `^arn:aws:iam::[0-9]{12}:role/.+$` (IAM users rejected).
+5. Account ID sourced from `data.aws_caller_identity.current` (authenticated provider data) rather than trusted from tfvars
+6. Backend configuration documented in `terraform/backend/README.md` with copy-paste `backend {}` block including `use_lockfile = true` and no `dynamodb_table`, plus the Stage-2 bucket-policy template
+7. Terraform state file upload tested with `terraform init -migrate-state` (post-apply verification)
 
-**Tests Required:** Terraform plan must succeed against the configured backend; state lock test with two parallel 	erraform plan calls (second must fail with lock error)
+**Tests Required:** Terraform plan must succeed against the configured backend with 0 undeclared-variable warnings; state lock test with two parallel `terraform plan` calls (second must fail with lock error)
 
-**Expected Cost Impact:** 🟡[CHARGES] ~/month (S3 + DynamoDB minimal)
+**Expected Cost Impact:** 🟡[CHARGES] ~$0.01/month (S3 storage only; no DynamoDB)
 
-**Manual Verification:** ws s3api get-bucket-versioning returns Enabled; ws dynamodb describe-table returns table; attempt state write from CI and confirm success
+**Manual Verification (POST-APPLY — COMPLETED 2026-09-03):** `aws s3api get-bucket-versioning` returns Enabled; `aws s3api get-bucket-policy` shows 2 Deny statements in Stage 1 (insecure-transport, unencrypted-uploads); state-lock test with two `terraform plan` calls passed (both acquired and released the lock cleanly, no `.tflock` residue). Stage 2 (post-T01-07) plan remains pending — will be prepared once the Terraform deploy role ARN exists.
 
 ---
 
@@ -342,7 +365,9 @@ flowchart TD
 1. Table cloudsec-{env}-findings with partition key inding_id (String) and sort key ingested_at (String, ISO 8601)
 2. GSI principal-index on principal_arn + ingested_at
 3. GSI source-ip-index on source_ip + ingested_at
-4. GSI esource-index on esource_arn + ingested_at
+4. GSI 
+esource-index on 
+esource_arn + ingested_at
 5. GSI ccount-index on source_account + ingested_at
 6. KMS encryption with cloudsec-{env}-finding-key
 7. PITR enabled (35 days)
@@ -424,7 +449,8 @@ flowchart TD
 
 **Dependencies:** None
 
-**Security Considerations:** Schema must include event_id (UUID), event_type (enum), 	imestamp (ISO 8601), source_account, source_region, principal_arn (optional), esource_arn (optional). No PII fields. Schema must use $id for referenceable types.
+**Security Considerations:** Schema must include event_id (UUID), event_type (enum), 	imestamp (ISO 8601), source_account, source_region, principal_arn (optional), 
+esource_arn (optional). No PII fields. Schema must use $id for referenceable types.
 
 **Acceptance Criteria:**
 1. Six event types defined: FindingIngested, IncidentCreated, IncidentStatusChanged, InvestigationStarted, InvestigationCompleted, RemediationExecuted, RemediationVerified, RemediationFailed
@@ -562,7 +588,8 @@ flowchart TD
 2. Lambda cloudsec-{env}-guardduty-ingestor receives events and:
    - Validates event structure against expected GuardDuty Finding schema
    - Extracts: finding_id, severity, resource_arn, principal_arn (if present), service_name, event_id, region, account_id
-   - Tags event with source_account, source_region, eceived_at
+   - Tags event with source_account, source_region, 
+eceived_at
    - Writes normalized finding to DynamoDB findings table
    - Publishes FindingIngested event to security bus
 3. Invalid/malformed events are sent to DLQ with original payload
@@ -655,7 +682,10 @@ flowchart TD
 **Acceptance Criteria:**
 1. S3 bucket notification on .json.gz files in CloudTrail/ prefix triggers Lambda
 2. Lambda decompresses and parses each CloudTrail record
-3. Each record normalized to internal schema: event_name, event_source, user_identity.arn, source_ip_address, esources[].ARN, event_time, ws_region, equest_parameters, esponse_elements, error_code
+3. Each record normalized to internal schema: event_name, event_source, user_identity.arn, source_ip_address, 
+esources[].ARN, event_time, ws_region, 
+equest_parameters, 
+esponse_elements, error_code
 4. Events written to DynamoDB findings table
 5. FindingIngested event published to security bus for management events
 6. Batch processing: Lambda processes up to 1000 records per invocation
@@ -845,10 +875,12 @@ flowchart TD
 **Security Considerations:** Resource ARN comparison must handle ARN aliases and path variations (e.g., rn:aws:iam::123:role/admin vs rn:aws:iam::123:role/team/admin).
 
 **Acceptance Criteria:**
-1. correlate_by_resource(findings, window_minutes=60) groups findings sharing the same esource_arn within the time window
+1. correlate_by_resource(findings, window_minutes=60) groups findings sharing the same 
+esource_arn within the time window
 2. ARN normalization handles: trailing slashes, case-insensitive service names, region variations (global vs regional ARN)
 3. Wildcard ARNs in findings are excluded from resource correlation
-4. Findings without esource_arn are not correlated by resource
+4. Findings without 
+esource_arn are not correlated by resource
 5. Each group has a correlation_type=resource_arn tag
 
 **Tests Required:** Unit tests for: same resource same window, ARN normalization, wildcard exclusion, missing resource ARN
@@ -1050,7 +1082,8 @@ ormal_regions → +0.3
    - API call not in common_api_calls → +0.2
    - Activity outside 	ypical_hours (±2 hours) → +0.2
    - New role assumption not in common_assumed_roles → +0.3
-   - No baseline exists → return nomaly_score=0.5, eason=\"new_principal\"
+   - No baseline exists → return nomaly_score=0.5, 
+eason=\"new_principal\"
 3. If aseline_confidence < 0.5, return nomaly_score=None (insufficient data)
 4. Anomaly scores capped at 1.0
 5. Anomaly results included in the Investigation Report evidence package (Phase 6)
@@ -1118,7 +1151,8 @@ ormal_regions → +0.3
 
 **Dependencies:** T04-01, T05-01, T06-01
 
-**Security Considerations:** Evidence packaging must not include full CloudTrail equest_parameters that may contain secrets (passwords, tokens). Sensitive fields are redacted before packaging.
+**Security Considerations:** Evidence packaging must not include full CloudTrail 
+equest_parameters that may contain secrets (passwords, tokens). Sensitive fields are redacted before packaging.
 
 **Acceptance Criteria:**
 1. package_evidence(incident_id) assembles:
@@ -1128,7 +1162,11 @@ ormal_regions → +0.3
    - Anomaly detection results
    - Blast radius data (from Phase 8, if available)
    - Timeline events (from Phase 7, if available)
-2. Sensitive fields redacted: equestParameters.password, equestParameters.accessKey, equestParameters.secretKey, equestParameters.token
+2. Sensitive fields redacted: 
+equestParameters.password, 
+equestParameters.accessKey, 
+equestParameters.secretKey, 
+equestParameters.token
 3. Evidence package size capped at 4000 tokens (input to Bedrock); excess evidence is summarized
 4. Evidence includes evidence_id (UUID) for each item, enabling citation cross-reference validation
 5. Package includes incident_id, severity, created_at, evidence_count metadata
@@ -1166,7 +1204,9 @@ ormal_regions → +0.3
    - ffected_resources (array of objects, maxItems=20)
    - evidence_citations (array of objects, maxItems=20, each has evidence_id and quote)
    - 	imeline_summary (string, maxLength=2000)
-   - ecommended_actions (array of objects, maxItems=5, each has ction, severity, ationale)
+   - 
+ecommended_actions (array of objects, maxItems=5, each has ction, severity, 
+ationale)
 2. Schema passes $schema validation
 3. Python dataclass InvestigationReport generated from schema
 4. alidate_report(report_json) raises SchemaValidationError with specific field-level error messages
@@ -1201,7 +1241,8 @@ ormal_regions → +0.3
    - Invokes Bedrock with model from SSM, max_tokens from SSM, temperature=0
    - Parses response as JSON
    - Validates against investigation report schema
-   - On schema validation failure: retry up to etry_max times with regenerated prompt
+   - On schema validation failure: retry up to 
+etry_max times with regenerated prompt
    - On all retries exhausted: emit InvestigationFailed event, return error
    - On success: write report to DynamoDB incidents table, emit InvestigationCompleted event
 2. Prompt template includes:
@@ -1275,13 +1316,16 @@ ormal_regions → +0.3
 **Acceptance Criteria:**
 1. invoke_bedrock(prompt, model_id, max_tokens, temperature) wraps the Bedrock SDK call
 2. Retry behavior:
-   - ThrottlingException: retry with exponential backoff (1s, 2s, 4s, 8s), max etry_max attempts
-   - ServiceUnavailableException: retry with exponential backoff, max etry_max attempts
+   - ThrottlingException: retry with exponential backoff (1s, 2s, 4s, 8s), max 
+etry_max attempts
+   - ServiceUnavailableException: retry with exponential backoff, max 
+etry_max attempts
    - AccessDeniedException: NEVER retry, raise immediately
    - ValidationError: NEVER retry (prompt issue), raise immediately
    - ModelInvocationException (LENGTH): retry once with halved max_tokens
 3. Timeout: each Bedrock call has a 45-second socket timeout (Lambda has 90s total)
-4. Each retry increments CloudWatch metric BedrockRetryCount with dimension etry_reason
+4. Each retry increments CloudWatch metric BedrockRetryCount with dimension 
+etry_reason
 5. Final failure emits CloudWatch metric BedrockFinalFailure
 
 **Tests Required:** Unit tests for: throttling retry succeeds on 2nd attempt, service unavailable retry succeeds, access denied never retried, validation error never retried, LENGTH retry with halved tokens, final failure after all retries
@@ -1316,7 +1360,9 @@ ormal_regions → +0.3
 **Acceptance Criteria:**
 1. uild_timeline(incident_id) retrieves all findings and CloudTrail events for the incident's time window
 2. Events sorted chronologically by event_time (UTC)
-3. Each event in timeline includes: event_time, event_type, principal_arn, esource_arn, event_name, source_account, egion, evidence_id
+3. Each event in timeline includes: event_time, event_type, principal_arn, 
+esource_arn, event_name, source_account, 
+egion, evidence_id
 4. Timeline gap detection: if gap between consecutive events exceeds 60 minutes, mark as 	imeline_gap with start/end times
 5. Timeline includes a gap_analysis field describing each gap
 6. Timeline capped at 200 events (earliest 100 + latest 100 if more)
@@ -1415,7 +1461,8 @@ ormal_regions → +0.3
 **Security Considerations:** Cross-account activity is a strong indicator of lateral movement and must be clearly labeled.
 
 **Acceptance Criteria:**
-1. Each timeline event tagged with cross_account: true/false based on whether principal_arn account differs from esource_arn account
+1. Each timeline event tagged with cross_account: true/false based on whether principal_arn account differs from 
+esource_arn account
 2. AssumeRole events that cross accounts tagged with lateral_movement: true
 3. Summary field: cross_account_summary lists unique account pairs involved
 4. Cross-account events get +0.1 confidence boost for attack severity
@@ -1443,9 +1490,11 @@ ormal_regions → +0.3
 **Security Considerations:** Reconstruction data is included as evidence for the AI investigation — must be properly redacted (same redaction rules as T06-02).
 
 **Acceptance Criteria:**
-1. econstruct_attack(incident_id) runs all reconstruction stages and returns structured result
+1. 
+econstruct_attack(incident_id) runs all reconstruction stages and returns structured result
 2. Result includes: 	imeline (ordered events with stages), ttack_stages_detected (unique stages), mitre_techniques (assigned techniques), cross_account_summary, 	imeline_gaps
-3. Result stored in DynamoDB incidents table under econstruction field
+3. Result stored in DynamoDB incidents table under 
+econstruction field
 4. Evidence packager (T06-02) includes reconstruction data in Bedrock prompt
 5. Reconstruction runs before Bedrock invocation in the investigation workflow
 
@@ -1453,7 +1502,8 @@ ormal_regions → +0.3
 
 **Expected Cost Impact:** 
 
-**Manual Verification:** Invoke reconstruction for a test incident; confirm DynamoDB record has econstruction field with timeline, stages, and techniques
+**Manual Verification:** Invoke reconstruction for a test incident; confirm DynamoDB record has 
+econstruction field with timeline, stages, and techniques
 
 
 ---
@@ -1543,8 +1593,10 @@ ormal_regions → +0.3
 2. For each role, checks if starting_principal_arn appears in trust policy as Principal
 3. BFS traversal with max depth 5
 4. Cycle detection: if a role appears twice in the path, traversal stops at that branch
-5. Returns: eachable_roles (list of ARNs), ssumption_paths (list of paths from start to each role), max_depth_reached
-6. Results include privilege_level for each reachable role: dmin, power_user, ead_only, custom (based on attached managed policies)
+5. Returns: 
+eachable_roles (list of ARNs), ssumption_paths (list of paths from start to each role), max_depth_reached
+6. Results include privilege_level for each reachable role: dmin, power_user, 
+ead_only, custom (based on attached managed policies)
 
 **Tests Required:** Unit tests for: direct trust relationship, multi-hop chain, cycle detection, max depth enforcement, no reachable roles
 
@@ -1582,7 +1634,8 @@ ormal_regions → +0.3
    - S3 buckets (default) → low
    - Other resources → low
 3. S3 bucket names can be overridden via a manual override list in SSM
-4. Each classification includes eason explaining why
+4. Each classification includes 
+eason explaining why
 
 **Tests Required:** Unit tests for: each classification level, override handling, unknown resource type, pattern matching
 
@@ -1609,9 +1662,11 @@ ormal_regions → +0.3
 **Acceptance Criteria:**
 1. compute_blast_radius(incident_id) orchestrates all analysis and returns:
    - principal_permissions: list of {action, effect} for each compromised principal
-   - eachable_roles: list of role ARNs and assumption paths
+   - 
+eachable_roles: list of role ARNs and assumption paths
    - ffected_resources: list of resources with sensitivity classification
-   - isk_score (0.0-10.0):
+   - 
+isk_score (0.0-10.0):
      - +2.0 per critical resource reachable
      - +1.0 per high resource reachable
      - +0.5 per medium resource reachable
@@ -1619,7 +1674,8 @@ ormal_regions → +0.3
      - +2.0 if cross-account role reachable
      - +1.0 per 10 allowed actions
      - Cap at 10.0
-   - isk_level: CRITICAL (8-10), HIGH (5-7.9), MEDIUM (3-4.9), LOW (<3)
+   - 
+isk_level: CRITICAL (8-10), HIGH (5-7.9), MEDIUM (3-4.9), LOW (<3)
    - 	op_risk_factors: top 3 factors contributing to score
 2. Report stored in DynamoDB incidents table under last_radius field
 3. Report includes nalysis_timestamp, nalysis_method for each component
@@ -1653,14 +1709,16 @@ ormal_regions → +0.3
 
 **Requirements Satisfied:** R9 (approved action policy)
 
-**Dependencies:** T06-03 (investigation schema provides ecommended_actions)
+**Dependencies:** T06-03 (investigation schema provides 
+ecommended_actions)
 
 **Security Considerations:** ⚠️[SECURITY-RISK] This policy is the single source of truth for what the platform is allowed to do. It must be reviewed and approved by a security engineer before any Level 1 action is permitted. Changes to this policy require a pull request and security review.
 
 **Acceptance Criteria:**
 1. Policy defines actions for each remediation scenario:
    - disable_iam_key: allowed_params: {user_name, access_key_id}; applicable_when: inding_type in [UnauthorizedAccess, UnauthorizedAPI] and evidence_confidence > 0.7
-   - evoke_security_group_ingress: allowed_params: {group_id, cidr, port}; applicable_when: cidr in [0.0.0.0/0, ::/0] and port > 1024
+   - 
+evoke_security_group_ingress: allowed_params: {group_id, cidr, port}; applicable_when: cidr in [0.0.0.0/0, ::/0] and port > 1024
    - lock_s3_public_access: allowed_params: {bucket_name}; applicable_when: inding_type=PublicS3Bucket
    - isolate_ec2_instance: allowed_params: {instance_id}; applicable_when: inding_type=CompromisedEC2
    - enable_cloudtrail_logging: allowed_params: {trail_name}; applicable_when: inding_type=CloudTrailTampering
@@ -1668,13 +1726,15 @@ ormal_regions → +0.3
 2. Each action has level: 1 (automatic), 2 (approval required), 3 (recommendation only)
 3. Level assignments (default):
    - disable_iam_key: Level 2 (approval required — could lock out legitimate user)
-   - evoke_security_group_ingress: Level 2
+   - 
+evoke_security_group_ingress: Level 2
    - lock_s3_public_access: Level 1 (automatic — reversible)
    - isolate_ec2_instance: Level 2
    - enable_cloudtrail_logging: Level 1 (automatic — safety improvement)
    - detach_privilege_escalation_policy: Level 2
 4. Policy stored in S3 (versioned) and loaded into SSM Parameter Store at deploy time
-5. Policy includes last_reviewed timestamp and eviewer field
+5. Policy includes last_reviewed timestamp and 
+eviewer field
 
 **Tests Required:** Unit tests for: policy JSON is valid, all actions have required fields, level values are valid (1-3), applicable_when conditions are parseable
 
@@ -1705,7 +1765,8 @@ ormal_regions → +0.3
    - params field is an object
    - params contains only keys allowed for that action
    - confidence field is a number between 0.0 and 1.0
-   - ationale field is a string with maxLength 1000
+   - 
+ationale field is a string with maxLength 1000
 2. On failure: return ValidationResult(level=3, reason=\"schema_invalid\", details=[...])
 3. On success: pass to next stage (evidence validation)
 4. Schema validation is the FIRST check — no further stages run if this fails
@@ -1739,7 +1800,8 @@ ormal_regions → +0.3
    - ucket_name param appears in ffected_resources of investigation report
    - group_id param appears in evidence citations
    - instance_id param appears in ffected_resources of investigation report
-   - ole_arn param appears in ffected_principals of investigation report
+   - 
+ole_arn param appears in ffected_principals of investigation report
 2. On failure: return ValidationResult(level=3, reason=\"evidence_invalid\", details=[\"param X not found in evidence\"])
 3. On success: pass to next stage (policy validation)
 
@@ -1808,7 +1870,9 @@ ormal_regions → +0.3
 **Acceptance Criteria:**
 1. execute_validation(investigation_report) runs stages in order: schema → evidence → policy → risk classification
 2. If ANY stage fails, remaining stages are skipped and Level 3 is returned
-3. Decision stored in DynamoDB: decision_id, incident_id, ction, level, eason, isk_factors, created_at, expires_at (24h for Level 2)
+3. Decision stored in DynamoDB: decision_id, incident_id, ction, level, 
+eason, 
+isk_factors, created_at, expires_at (24h for Level 2)
 4. Events published:
    - Level 1 → RemediationApproved event (triggers Step Functions)
    - Level 2 → RemediationApprovalRequired event (triggers human approval)
@@ -1887,7 +1951,8 @@ ormal_regions → +0.3
 **Acceptance Criteria:**
 1. DynamoDB table cloudsec-{env}-idempotency with partition key idempotency_key (String) and sort key ction (String)
 2. cquire_lock(idempotency_key, action) uses DynamoDB PutItem with ConditionExpression ttribute_not_exists(idempotency_key) AND attribute_not_exists(action)
-3. elease_lock(idempotency_key, action) deletes the item
+3. 
+elease_lock(idempotency_key, action) deletes the item
 4. Lock TTL: 30 minutes (auto-expire stale locks)
 5. If lock acquisition fails (another execution in progress), return IdempotencyConflict with existing execution_id
 6. Idempotency key format: incident_id:action:principal_arn
@@ -1951,13 +2016,20 @@ ormal_regions → +0.3
 **Security Considerations:** Rollback is attempted only for actions where rollback is safe and well-defined. For irreversible actions (e.g., key deletion), rollback is not attempted and the incident is escalated.
 
 **Acceptance Criteria:**
-1. ollback_registry maps each action to its rollback function:
-   - lock_s3_public_access → evert_s3_public_access_block (re-applies previous policy)
-   - disable_iam_key → e-enable IAM key (only if key was not fully deleted)
-   - evoke_security_group_ingress → e-add security group ingress rule
-   - isolate_ec2_instance → e-attach original security group
+1. 
+ollback_registry maps each action to its rollback function:
+   - lock_s3_public_access → 
+evert_s3_public_access_block (re-applies previous policy)
+   - disable_iam_key → 
+e-enable IAM key (only if key was not fully deleted)
+   - 
+evoke_security_group_ingress → 
+e-add security group ingress rule
+   - isolate_ec2_instance → 
+e-attach original security group
    - enable_cloudtrail_logging → N/A (no rollback needed, it's additive)
-   - detach_privilege_escalation_policy → e-attach policy
+   - detach_privilege_escalation_policy → 
+e-attach policy
 2. Before executing any action, the current state is saved to DynamoDB (pre_remediation_state) for rollback reference
 3. On failure, execute_rollback(action, pre_state) is called
 4. If rollback also fails: incident is escalated with escalation_reason=rollback_failed
@@ -2066,7 +2138,8 @@ ormal_regions → +0.3
 **Security Considerations:** 🟣[AUTO-REMEDIATION] ⚠️[SECURITY-RISK] Revoking a security group rule could disrupt legitimate traffic. Pre-execution hook must confirm the rule is the one that was modified by the suspicious activity, not a pre-existing legitimate rule.
 
 **Acceptance Criteria:**
-1. evoke_ingress(group_id, cidr, from_port, to_port, protocol) calls ec2.revoke_security_group_ingress()
+1. 
+evoke_ingress(group_id, cidr, from_port, to_port, protocol) calls ec2.revoke_security_group_ingress()
 2. Pre-execution hook verifies:
    - Security group exists
    - Rule matches the one identified in the investigation report
@@ -2297,14 +2370,17 @@ ormal_regions → +0.3
 
 **Acceptance Criteria:**
 1. Table cloudsec-{env}-approval-decisions with partition key decision_id (String) and sort key created_at (String, ISO 8601)
-2. Decision record fields: decision_id, incident_id, ction, params, evidence_summary, isk_score, created_at, expires_at, status (PENDING, APPROVED, REJECTED, EXPIRED), pproved_by (ARN), pproved_at, ejection_reason
+2. Decision record fields: decision_id, incident_id, ction, params, evidence_summary, 
+isk_score, created_at, expires_at, status (PENDING, APPROVED, REJECTED, EXPIRED), pproved_by (ARN), pproved_at, 
+ejection_reason
 3. create_pending_decision() creates record with expires_at = created_at + 24 hours
 4. pprove_decision(decision_id, approver_arn) checks:
    - Decision exists and status is PENDING
    - Decision has not expired
    - Approver is not the same principal as the compromised identity (self-approval prevention)
    - On pass: status set to APPROVED, approved_by and approved_at recorded
-5. eject_decision(decision_id, approver_arn, reason) sets status to REJECTED
+5. 
+eject_decision(decision_id, approver_arn, reason) sets status to REJECTED
 6. EventBridge scheduled rule pproval-expiry-check runs every 5 minutes: scans for expired PENDING decisions, transitions to EXPIRED, escalates incident
 
 **Tests Required:** Unit tests for: create decision, approve valid decision, approve expired decision, approve by self (denied), reject decision, expiry check, double-approve prevention
@@ -2363,8 +2439,10 @@ ormal_regions → +0.3
 
 **Acceptance Criteria:**
 1. When a Level 2 decision is created, Step Functions enters a WaitForApproval state with a callback URL
-2. pprove_decision() and eject_decision() call SendTaskSuccess or SendTaskFailed to resume the Step Functions execution
-3. Callback payload includes: decision_id, pproved_by, pproved_at (for approve) or ejection_reason (for reject)
+2. pprove_decision() and 
+eject_decision() call SendTaskSuccess or SendTaskFailed to resume the Step Functions execution
+3. Callback payload includes: decision_id, pproved_by, pproved_at (for approve) or 
+ejection_reason (for reject)
 4. If decision expires while Step Functions is waiting: Step Functions receives timeout → incident escalated
 5. Callback token is stored in DynamoDB approval decisions table with callback_url
 6. Step Functions WaitForApproval state has timeout matching decision expiry (24 hours minus 1 hour buffer)
@@ -2433,7 +2511,8 @@ ormal_regions → +0.3
 **Security Considerations:** Re-checking must not trigger new findings. GuardDuty findings are re-evaluated by the service — we only check if the finding status changed to ARCHIVED. Security Hub findings are checked for resolution.
 
 **Acceptance Criteria:**
-1. echeck_findings(incident_id) for each finding in the incident:
+1. 
+echeck_findings(incident_id) for each finding in the incident:
    - GuardDuty: check if finding status is ARCHIVED (GuardDuty auto-archives after remediation)
    - Security Hub: check if finding has Compliance.Status=PASSED or RecordState=ARCHIVED
    - CloudTrail: check that the suspicious API action has not been repeated in the last 30 minutes
@@ -2465,14 +2544,16 @@ ormal_regions → +0.3
 **Security Considerations:** ⚠️[SECURITY-RISK] False resolution (marking an incident resolved when the threat is not actually contained) is a critical failure. Resolution requires ALL verification checks to pass. Any single failure triggers escalation.
 
 **Acceptance Criteria:**
-1. esolve_or_escalate(incident_id) evaluates:
+1. 
+esolve_or_escalate(incident_id) evaluates:
    - All state verifications passed (T13-01) → state_verified=True
    - All findings re-checked and contained (T13-02) → containment_confirmed=True
    - No new findings for this incident in the last 5 minutes → 
 o_new_findings=True
 2. RESOLVE if ALL three conditions are True:
    - Incident status → RESOLVED
-   - esolved_at and 	ime_to_resolve_seconds recorded
+   - 
+esolved_at and 	ime_to_resolve_seconds recorded
    - IncidentResolved event published
 3. ESCALATE if ANY condition is False:
    - Incident status → ESCALATED
@@ -2505,7 +2586,8 @@ o_new_findings=True
 
 **Acceptance Criteria:**
 1. Lambda cloudsec-{env}-verification-engine deployed with read-only IAM role
-2. EventBridge rule emediation-executed on security bus matches detail-type=RemediationExecuted and targets verification Lambda
+2. EventBridge rule 
+emediation-executed on security bus matches detail-type=RemediationExecuted and targets verification Lambda
 3. Verification Lambda runs the full verification chain: state check → finding re-check → resolve/escalate
 4. Lambda timeout: 60 seconds, memory: 512 MB
 5. Verification results stored in incidents table
@@ -2653,7 +2735,10 @@ o_new_findings=True
    - Pre and post state snapshots
    - Verification results
 2. Written to S3 as evidence/{incident_id}/remediation_history.json
-3. Includes executions: array of {execution_id, ction, started_at, completed_at, status, esult, ollback_performed, ollback_result}
+3. Includes executions: array of {execution_id, ction, started_at, completed_at, status, 
+esult, 
+ollback_performed, 
+ollback_result}
 4. Written with object-lock retention matching bucket default
 5. Reference stored in DynamoDB incidents table under evidence.remediation_history_s3_key
 
@@ -2721,10 +2806,12 @@ o_new_findings=True
 
 **Acceptance Criteria:**
 1. generate_json_report(incident_id) assembles:
-   - incident_id, severity, status, created_at, esolved_at/escalated_at, 	ime_to_resolve_seconds
+   - incident_id, severity, status, created_at, 
+esolved_at/escalated_at, 	ime_to_resolve_seconds
    - executive_summary (from investigation report)
    - 	imeline (from reconstruction, ordered events with attack stages)
-   - oot_cause (from investigation report summary)
+   - 
+oot_cause (from investigation report summary)
    - ttack_stages_detected (from reconstruction)
    - mitre_attack_techniques (from reconstruction)
    - ffected_principals (from findings)
@@ -2733,7 +2820,9 @@ o_new_findings=True
    - ctions_taken (from remediation audit log)
    - evidence (manifest reference + file list)
    - erification (verification results)
-   - ecommendations (from investigation report ecommended_actions)
+   - 
+ecommendations (from investigation report 
+ecommended_actions)
 2. Report stored in S3 as evidence/{incident_id}/incident_report.json
 3. Report schema validated before storage
 4. Triggered by IncidentResolved or IncidentEscalated event
@@ -2873,10 +2962,15 @@ o_new_findings=True
 1. Table cloudsec-{env}-knowledge-base with partition key incident_id (String) and sort key ingested_at (String)
 2. GSI ttack_stage-index on ttack_stage + ingested_at
 3. GSI mitre_technique-index on mitre_technique + ingested_at
-4. GSI emediation_action-index on emediation_action + ingested_at
+4. GSI 
+emediation_action-index on 
+emediation_action + ingested_at
 5. Only incidents with status=RESOLVED are ingested
 6. Ingestion triggered by IncidentResolved event
-7. Stored fields: incident_id, ttack_stage, mitre_techniques (array), emediation_actions (array), 	imeline_pattern (summarized), esolution_success (true), last_radius_risk_score, oot_cause_category, ingested_at
+7. Stored fields: incident_id, ttack_stage, mitre_techniques (array), 
+emediation_actions (array), 	imeline_pattern (summarized), 
+esolution_success (true), last_radius_risk_score, 
+oot_cause_category, ingested_at
 8. All ARNs, IPs, and credential material are redacted before storage
 9. Knowledge base records are NOT sent to Bedrock as raw text — they are used as structured query results
 
@@ -2903,7 +2997,8 @@ o_new_findings=True
 **Security Considerations:** ⚠️[SECURITY-RISK] This is a critical control — any sensitive data leaked to Bedrock (and potentially to the model provider) is a data breach. Redaction must be exhaustive and fail-closed.
 
 **Acceptance Criteria:**
-1. edact_for_bedrock(text) removes or masks:
+1. 
+edact_for_bedrock(text) removes or masks:
    - IAM ARNs → [REDACTED_ARN]
    - IP addresses (IPv4 and IPv6) → [REDACTED_IP]
    - AWS account IDs → [REDACTED_ACCOUNT]
@@ -2913,9 +3008,12 @@ o_new_findings=True
    - S3 bucket URLs → [REDACTED_S3_URL]
    - DynamoDB table ARNs → [REDACTED_TABLE]
 2. Redaction uses regex patterns defined in lambda/knowledge_base/redaction_patterns.py
-3. edact_incident_data(incident_data) applies redaction to all string fields in the incident JSON
-4. edact_finding_data(finding) applies redaction to finding fields
-5. edact_evidence(evidence) applies redaction to evidence text
+3. 
+edact_incident_data(incident_data) applies redaction to all string fields in the incident JSON
+4. 
+edact_finding_data(finding) applies redaction to finding fields
+5. 
+edact_evidence(evidence) applies redaction to evidence text
 6. If redaction fails (exception), the data is NOT sent to Bedrock — investigation is escalated
 7. All redaction patterns are tested against known sensitive data patterns
 
@@ -2945,7 +3043,8 @@ o_new_findings=True
 1. query_knowledge_base(incident_data) retrieves relevant entries using:
    - ttack_stage match (GSI query)
    - mitre_technique match (GSI query)
-   - oot_cause_category match (filter)
+   - 
+oot_cause_category match (filter)
 2. Results sorted by relevance score: same attack_stage (+3), same MITRE technique (+2), same root cause (+1)
 3. Maximum 5 entries returned
 4. Entries redacted via T16-02 before inclusion in Bedrock prompt
@@ -2984,7 +3083,8 @@ o_new_findings=True
 
 **Acceptance Criteria:**
 1. lambda/common/logger.py provides get_logger(name) returning a structured JSON logger
-2. Every log entry includes: 	imestamp (ISO 8601 UTC), level, unction_name, equest_id, incident_id (if applicable), message
+2. Every log entry includes: 	imestamp (ISO 8601 UTC), level, unction_name, 
+equest_id, incident_id (if applicable), message
 3. Error logs include error_type, error_message, stack_trace
 4. Log groups follow naming: cloudsec/{env}/{component}
 5. Log retention: 30 days (dev), 365 days (prod)
@@ -3176,6 +3276,8 @@ o_new_findings=True
 
 ### Task T18-01: Provision Isolated Lab Environment
 
+**Status:** COMPLETE (shared-account strict-isolation variant deployed and verified 2026-09-04; separate state, isolated VPC, no peering/transit attachments, dedicated CloudTrail, GuardDuty, Security Hub, and bounded lab operator)
+
 **Objective:** Create the dedicated lab environment with no trust relationship to production resources.
 
 **Files/Components Affected:** 	erraform/environments/lab/ (separate environment with lab backend)
@@ -3213,6 +3315,8 @@ o_new_findings=True
 ---
 
 ### Task T18-02: Build Simulation Scenarios for All Six Incident Types
+
+**Status:** COMPLETE (all six guarded simulations executed 2026-09-04; temporary resources cleaned up and lab trail restored)
 
 **Objective:** Create the simulation scripts and test resources for each incident type.
 
@@ -3252,6 +3356,8 @@ o_new_findings=True
 
 ### Task T18-03: Create Simulation Orchestration Script
 
+**Status:** COMPLETE (dry-run, confirmed execution, retrying Security Hub validation, and cleanup paths verified 2026-09-04; six unique practice finding IDs validated)
+
 **Objective:** Build a single script that runs all six simulations sequentially with proper wait times and cleanup.
 
 **Files/Components Affected:** lab/simulations/run_all_simulations.sh, lab/simulations/validate_simulations.py
@@ -3265,7 +3371,8 @@ o_new_findings=True
 **Security Considerations:** Orchestration script has --dry-run mode that prints what would be executed without running anything. --confirm flag required for actual execution.
 
 **Acceptance Criteria:**
-1. un_all_simulations.sh runs all six simulations sequentially
+1. 
+un_all_simulations.sh runs all six simulations sequentially
 2. Between each simulation: 2-minute wait for findings to propagate
 3. After all simulations: alidate_simulations.py checks that findings were created for each incident type
 4. Output: simulation log with pass/fail for each incident type
@@ -3283,6 +3390,8 @@ o_new_findings=True
 ---
 
 ### Task T18-04: Document Lab Operations and Safety Procedures
+
+**Status:** COMPLETE (`docs/lab-operations.md` documents architecture, deployment, execution, validation, cleanup, emergency response, cost, and troubleshooting)
 
 **Objective:** Write the lab operations guide covering setup, simulation execution, safety procedures, and cleanup.
 
@@ -3328,6 +3437,8 @@ o_new_findings=True
 
 ### Task T19-01: Implement End-to-End Test Framework and Harness
 
+**Status:** COMPLETE (lab guardrails, encrypted SSM configuration, 12-scenario registry, and read-only harness validation passed 2026-09-05)
+
 **Objective:** Build the E2E test harness that orchestrates the full incident lifecycle test scenarios.
 
 **Files/Components Affected:** 	ests/e2e/__init__.py, 	ests/e2e/test_harness.py, 	ests/e2e/conftest.py, 	ests/e2e/test_config.py
@@ -3342,7 +3453,8 @@ o_new_findings=True
 
 **Acceptance Criteria:**
 1. 	ests/e2e/test_harness.py provides:
-   - E2ETestRunner class with un_test(scenario_name), cleanup(), ssert_incident_resolved(incident_id), ssert_incident_escalated(incident_id)
+   - E2ETestRunner class with 
+un_test(scenario_name), cleanup(), ssert_incident_resolved(incident_id), ssert_incident_escalated(incident_id)
    - Test configuration loaded from SSM Parameter Store (/cloudsec/lab/e2e/)
    - Lab environment validation at test start (account ID check)
 2. 	ests/e2e/conftest.py provides pytest fixtures:
@@ -3364,6 +3476,8 @@ o_new_findings=True
 ---
 
 ### Task T19-02: Test Scenario — Successful Automatic Remediation (Level 1)
+
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
 
 **Objective:** Verify the complete lifecycle for a Level 1 automated remediation (Public S3 Exposure → automatic block).
 
@@ -3401,6 +3515,8 @@ o_new_findings=True
 
 ### Task T19-03: Test Scenario — Approval-Required Remediation (Level 2)
 
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
+
 **Objective:** Verify the complete lifecycle for a Level 2 remediation requiring human approval (Compromised IAM Credential → key disable).
 
 **Files/Components Affected:** 	ests/e2e/scenarios/test_level2_approval_remediation.py
@@ -3435,6 +3551,8 @@ o_new_findings=True
 ---
 
 ### Task T19-04: Test Scenario — Rejected Unsafe AI Action (Level 3)
+
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
 
 **Objective:** Verify that a malformed or unsupported AI remediation recommendation is correctly rejected as Level 3 and does not execute.
 
@@ -3472,6 +3590,8 @@ o_new_findings=True
 
 ### Task T19-05: Test Scenario — Malformed Bedrock Response
 
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
+
 **Objective:** Verify that a malformed or non-JSON Bedrock response is handled correctly with retry and eventual failure escalation.
 
 **Files/Components Affected:** 	ests/e2e/scenarios/test_malformed_bedrock_response.py
@@ -3491,8 +3611,10 @@ o_new_findings=True
    - Bedrock returns JSON with invalid enum values → schema validation fails → retry
    - All retries exhausted → InvestigationFailed event → incident escalated
 2. Assertions:
-   - Retry count matches configured etry_max (3)
-   - Each retry is logged with etry_reason
+   - Retry count matches configured 
+etry_max (3)
+   - Each retry is logged with 
+etry_reason
    - BedrockFinalFailure CloudWatch metric is emitted
    - Investigation report has alidation_status=REJECTED (if partially valid) or no report (if completely malformed)
    - Incident transitions to ESCALATED with escalation_reason=investigation_failed
@@ -3507,6 +3629,8 @@ o_new_findings=True
 ---
 
 ### Task T19-06: Test Scenario — Bedrock Timeout and Service Failure
+
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
 
 **Objective:** Verify that Bedrock timeouts and service unavailability are handled with correct retry behavior and graceful degradation.
 
@@ -3528,7 +3652,8 @@ o_new_findings=True
    - DynamoDB ProvisionedThroughputExceededException on incident update → retry → eventual success
 2. Assertions:
    - Backoff intervals match expected values (1s, 2s, 4s)
-   - BedrockRetryCount metric incremented with correct etry_reason dimension
+   - BedrockRetryCount metric incremented with correct 
+etry_reason dimension
    - On final success after retries: investigation completes normally
    - On final failure: incident escalated, no remediation attempted
    - Incident record is not lost (exists in DynamoDB with status=INVESTIGATING during retry)
@@ -3542,6 +3667,8 @@ o_new_findings=True
 ---
 
 ### Task T19-07: Test Scenario — Failed Remediation and Rollback
+
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
 
 **Objective:** Verify that a failed remediation triggers rollback (where applicable), escalates the incident, and preserves audit trail.
 
@@ -3579,6 +3706,8 @@ o_new_findings=True
 
 ### Task T19-08: Test Scenario — Failed Verification and Escalation
 
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
+
 **Objective:** Verify that failed post-remediation verification correctly escalates the incident and does not falsely resolve it.
 
 **Files/Components Affected:** 	ests/e2e/scenarios/test_failed_verification.py
@@ -3613,6 +3742,8 @@ o_new_findings=True
 ---
 
 ### Task T19-09: Test Scenario — Duplicate Events and Idempotency
+
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
 
 **Objective:** Verify that duplicate findings and duplicate remediation executions are handled correctly without causing double-processing or double-execution.
 
@@ -3650,6 +3781,8 @@ o_new_findings=True
 
 ### Task T19-10: Test Scenario — Cross-Account Events
 
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
+
 **Objective:** Verify that cross-account telemetry events are correctly ingested, correlated, and handled in the multi-account architecture.
 
 **Files/Components Affected:** 	ests/e2e/scenarios/test_cross_account_events.py
@@ -3684,6 +3817,8 @@ o_new_findings=True
 ---
 
 ### Task T19-11: Test Scenario — Insufficient Evidence
+
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
 
 **Objective:** Verify that the platform handles incidents where the AI investigation report has insufficient or no supporting evidence correctly.
 
@@ -3720,6 +3855,8 @@ o_new_findings=True
 ---
 
 ### Task T19-12: Test Scenario — DLQ and Retry Behavior
+
+**Status:** IMPLEMENTED — LIVE LAB CHECKPOINT PENDING
 
 **Objective:** Verify that unparseable events are correctly routed to the DLQ, retained for 14 days, and that the DLQ alarm fires when depth exceeds threshold.
 
@@ -4361,7 +4498,7 @@ Tasks that enable or deploy billable AWS services.
 
 | Task ID | Service(s) | Cost Driver |
 |---------|-----------|-------------|
-| T01-02 | S3, DynamoDB | Backend storage (minimal, ~/month) |
+| T01-02 | S3 | Backend state bucket (minimal, ~$0.01/month storage only) |
 | T01-06 | KMS | Customer-managed keys (~/key/year) |
 | T02-01 | DynamoDB | Incident table (on-demand) |
 | T02-02 | DynamoDB | Findings table (on-demand) |

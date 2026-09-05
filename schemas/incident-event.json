@@ -1,0 +1,51 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudsec-ai.internal/schemas/incident-event.json",
+  "title": "Incident Events",
+  "description": "Events for incident lifecycle: IncidentCreated, IncidentStatusChanged.",
+  "$defs": {
+    "IncidentCreated": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "source_account", "source_region", "incident_id", "severity", "status", "finding_ids", "correlation_type", "created_at"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "IncidentCreated"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "source_account": {"$ref": "./common-types.json#/$defs/AccountId"},
+        "source_region": {"type": "string"},
+        "incident_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "severity": {"$ref": "./common-types.json#/$defs/Severity"},
+        "status": {"const": "OPEN"},
+        "finding_ids": {"type": "array", "items": {"type": "string"}, "minItems": 1},
+        "correlation_type": {"type": "string", "enum": ["principal_arn", "source_ip", "resource_arn", "account"]},
+        "principal_arn": {"$ref": "./common-types.json#/$defs/Arn", "nullable": true, "default": null},
+        "resource_arn": {"$ref": "./common-types.json#/$defs/Arn", "nullable": true, "default": null},
+        "source_ip": {"$ref": "./common-types.json#/$defs/IpAddress", "nullable": true, "default": null},
+        "created_at": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "ttl": {"type": "integer", "minimum": 1, "description": "Unix epoch seconds for TTL expiry"},
+        "window_start": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "window_end": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "version": {"type": "integer", "minimum": 1, "default": 1, "description": "Optimistic-lock version counter"}
+      }
+    },
+    "IncidentStatusChanged": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "incident_id", "previous_status", "new_status", "reason", "changed_at"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "IncidentStatusChanged"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "incident_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "previous_status": {"$ref": "./common-types.json#/$defs/Status"},
+        "new_status": {"$ref": "./common-types.json#/$defs/Status"},
+        "reason": {"type": "string", "minLength": 1},
+        "changed_by": {"type": "string", "description": "Lambda name or principal that made the transition"},
+        "changed_at": {"$ref": "./common-types.json#/$defs/Timestamp"}
+      }
+    }
+  }
+}

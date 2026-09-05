@@ -57,15 +57,7 @@ jobs:
           pip install pytest pytest-cov boto3 botocore moto jinja2 requests jsonschema
 
       - name: Run unit tests
-        run: |
-          # NOTE (T01-01 → T02+): This stage is non-blocking at T01-01 because
-          # no application code or tests exist yet (structural skeleton only).
-          # Once testable Lambda code exists (Phase 2+), remove the `|| true`
-          # and uncomment the coverage gate below to enforce the 90% minimum.
-          pytest tests/unit --cov=lambda --cov-report=term-missing -v || true
-
-          # # Long-term gate — enable when tests exist:
-          # pytest tests/unit --cov=lambda --cov-report=term-missing --cov-fail-under=90
+        run: pytest tests/unit --cov=lambda --cov-report=term-missing -v
 
   tfsec:
     name: tfsec (Infrastructure Security Scan)

@@ -5,9 +5,12 @@
 # NEVER commit prod.tfvars with real secrets.
 
 environment        = "prod"
-account_id         = "<PROD_ACCOUNT_ID>"
+account_id         = "<SECURITY_ACCOUNT_ID>"   # 12-digit AWS account ID
 security_account_id = "<SECURITY_ACCOUNT_ID>"
 region             = "us-east-1"
+
+# Terraform deploy role — used by backend bootstrap bucket policy
+terraform_deploy_role_arn = "arn:aws:iam::<SECURITY_ACCOUNT_ID>:role/CloudSecAI-TerraformDeploy"
 
 # Cross-account role ARNs
 read_role_arn         = "arn:aws:iam::<WORKLOAD_ACCOUNT_ID>:role/CloudSecAI-ReadRole"
@@ -21,8 +24,8 @@ cost_center  = "security"
 # Evidence bucket — MUST be true in prod (Object Lock for forensic integrity)
 evidence_bucket_object_lock = true
 
-# Budget (monthly, USD)
-budget_monthly_limit = 2000.0
+# Budget (monthly, USD) — exact limits defined per environment in T01-08
+budget_monthly_limit = 0.0
 
 # Approval (human-in-the-loop)
 approval_sns_topic_arn = "arn:aws:sns:<REGION>:<SECURITY_ACCOUNT_ID>:cloudsec-prod-escalations"

@@ -1,0 +1,33 @@
+<mxfile host="app.diagrams.net" modified="2026-09-05T00:00:00.000Z" agent="CloudSec AI" version="24.7.17">
+  <diagram id="cloudsec" name="CloudSec AI Architecture">
+    <mxGraphModel dx="1600" dy="900" grid="1" gridSize="10" page="1" pageWidth="1600" pageHeight="900">
+      <root><mxCell id="0"/><mxCell id="1" parent="0"/>
+        <mxCell id="workload" value="WORKLOAD ACCOUNTS&#xa;GuardDuty • Security Hub • CloudTrail • Config • VPC Flow Logs" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontStyle=1" vertex="1" parent="1"><mxGeometry x="40" y="60" width="340" height="120" as="geometry"/></mxCell>
+        <mxCell id="lab" value="ISOLATED LAB / DEMO&#xa;Disposable cloudsec-lab/demo resources&#xa;No production targets" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="1"><mxGeometry x="40" y="670" width="340" height="120" as="geometry"/></mxCell>
+        <mxCell id="security" value="SECURITY ACCOUNT — CONTROL PLANE" style="swimlane;html=1;rounded=1;fillColor=#f5f5f5;strokeColor=#666666;fontStyle=1" vertex="1" parent="1"><mxGeometry x="430" y="30" width="1110" height="790" as="geometry"/></mxCell>
+        <mxCell id="bus" value="EventBridge Security Bus&#xa;+ encrypted DLQ" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6" vertex="1" parent="security"><mxGeometry x="40" y="90" width="210" height="80" as="geometry"/></mxCell>
+        <mxCell id="ingest" value="Ingestion + Correlation&#xa;Lambda" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="security"><mxGeometry x="300" y="90" width="190" height="80" as="geometry"/></mxCell>
+        <mxCell id="ddb" value="KMS: Finding + Incident&#xa;DynamoDB tables&#xa;findings • incidents • baselines • decisions • audit • KB" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00" vertex="1" parent="security"><mxGeometry x="550" y="70" width="260" height="120" as="geometry"/></mxCell>
+        <mxCell id="investigate" value="Evidence Package → Investigation&#xa;Timeline • MITRE • Blast Radius" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="security"><mxGeometry x="300" y="250" width="240" height="100" as="geometry"/></mxCell>
+        <mxCell id="bedrock" value="Amazon Bedrock&#xa;ADVISORY ONLY&#xa;No AWS execution permission" style="rounded=1;whiteSpace=wrap;html=1;dashed=1;fillColor=#f8cecc;strokeColor=#b85450;fontStyle=1" vertex="1" parent="security"><mxGeometry x="40" y="260" width="210" height="90" as="geometry"/></mxCell>
+        <mxCell id="safety" value="Deterministic Safety Engine&#xa;Schema → citations → evidence → policy → risk" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontStyle=1" vertex="1" parent="security"><mxGeometry x="600" y="250" width="280" height="100" as="geometry"/></mxCell>
+        <mxCell id="approval" value="API Gateway + Cognito&#xa;Human approval (Level 2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf" vertex="1" parent="security"><mxGeometry x="850" y="410" width="210" height="80" as="geometry"/></mxCell>
+        <mxCell id="workflow" value="Step Functions&#xa;Allow-listed playbooks&#xa;rollback + audit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#e1d5e7;strokeColor=#9673a6;fontStyle=1" vertex="1" parent="security"><mxGeometry x="500" y="410" width="240" height="100" as="geometry"/></mxCell>
+        <mxCell id="verify" value="Independent Verification&#xa;Resolve or Escalate" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366" vertex="1" parent="security"><mxGeometry x="500" y="570" width="240" height="80" as="geometry"/></mxCell>
+        <mxCell id="evidence" value="KMS: Evidence&#xa;Versioned / Object-Locked S3&#xa;manifest • snapshots • history • reports" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d79b00" vertex="1" parent="security"><mxGeometry x="800" y="560" width="260" height="110" as="geometry"/></mxCell>
+        <mxCell id="e1" edge="1" parent="1" source="workload" target="bus" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e2" edge="1" parent="security" source="bus" target="ingest" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e3" edge="1" parent="security" source="ingest" target="ddb" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e4" edge="1" parent="security" source="ddb" target="investigate" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e5" edge="1" parent="security" source="investigate" target="bedrock" style="endArrow=block;dashed=1;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e6" edge="1" parent="security" source="investigate" target="safety" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e7" edge="1" parent="security" source="safety" target="workflow" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e8" edge="1" parent="security" source="safety" target="approval" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e9" edge="1" parent="security" source="approval" target="workflow" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e10" edge="1" parent="security" source="workflow" target="verify" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e11" edge="1" parent="security" source="verify" target="evidence" style="endArrow=block;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+        <mxCell id="e12" edge="1" parent="1" source="lab" target="bus" style="endArrow=block;dashed=1;html=1"><mxGeometry relative="1" as="geometry"/></mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

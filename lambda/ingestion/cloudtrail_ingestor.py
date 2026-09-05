@@ -1,6 +1,5 @@
-﻿# CloudSec AI — System.Collections.DictionaryEntry.Name
-# System.Collections.DictionaryEntry.Value
+"""Compatibility entrypoint for the CloudTrail parser."""
 
-def lambda_handler(event, context):
-    return {"statusCode": 200, "body": "not implemented"}
+from cloudtrail_parser import lambda_handler, normalize_record
 
+__all__ = ["lambda_handler", "normalize_record"]

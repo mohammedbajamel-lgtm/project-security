@@ -1,0 +1,5 @@
+bucket       = "REPLACE_WITH_DEMO_STATE_BUCKET"
+key          = "cloudsec-demo/terraform.tfstate"
+region       = "us-east-1"
+use_lockfile = true
+encrypt      = true

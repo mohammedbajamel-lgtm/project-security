@@ -1,0 +1,12 @@
+{
+  "last_reviewed": "2026-09-04",
+  "reviewer": "pending-security-engineer-review",
+  "actions": {
+    "disable_iam_key": {"level": 2, "allowed_params": ["user_name", "access_key_id"], "finding_types": ["UnauthorizedAccess", "UnauthorizedAPI"]},
+    "revoke_security_group_ingress": {"level": 2, "allowed_params": ["group_id", "cidr", "port"], "finding_types": ["OpenSecurityGroup"]},
+    "block_s3_public_access": {"level": 1, "allowed_params": ["bucket_name"], "finding_types": ["PublicS3Bucket"]},
+    "isolate_ec2_instance": {"level": 2, "allowed_params": ["instance_id"], "finding_types": ["CompromisedEC2"]},
+    "enable_cloudtrail_logging": {"level": 1, "allowed_params": ["trail_name"], "finding_types": ["CloudTrailTampering"]},
+    "detach_privilege_escalation_policy": {"level": 2, "allowed_params": ["role_arn", "policy_arn"], "finding_types": ["IAMPrivilegeEscalation"]}
+  }
+}

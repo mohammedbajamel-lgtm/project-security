@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudsec-ai.internal/schemas/common-types.json",
+  "title": "CloudSec AI Common Types",
+  "description": "Reusable type definitions used by all CloudSec AI internal events.",
+  "$defs": {
+    "AccountId": {"type": "string", "pattern": "^[0-9]{12}$", "description": "12-digit AWS account ID"},
+    "Arn": {"type": "string", "pattern": "^arn:[a-z0-9-]+:[a-z0-9-]+:[a-z0-9-]*:[0-9]*:[^:]+.*$", "description": "AWS ARN"},
+    "IpAddress": {"type": "string", "pattern": "^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$", "description": "IPv4 address"},
+    "Timestamp": {"type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](?:\\.[0-9]+)?(Z|[+-][01][0-9]:[0-5][0-9])$", "description": "ISO 8601 UTC timestamp"},
+    "Uuid": {"type": "string", "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$", "description": "UUID v4"},
+    "SchemaVersion": {"type": "string", "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+$", "description": "Semantic version string (major.minor.patch)"},
+    "Severity": {"type": "string", "enum": ["P1", "P2", "P3", "P4"], "description": "P1=critical, P2=high, P3=medium, P4=low"},
+    "Status": {"type": "string", "enum": ["OPEN", "INVESTIGATING", "REMEDIATING", "VERIFYING", "RESOLVED", "ESCALATED"], "description": "Incident lifecycle status"},
+    "FindingSource": {"type": "string", "enum": ["guardduty", "securityhub", "cloudtrail", "awsconfig", "vpcflowlogs", "securitylake"], "description": "Telemetry source"}
+  }
+}

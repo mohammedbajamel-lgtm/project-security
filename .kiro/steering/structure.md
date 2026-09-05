@@ -7,7 +7,7 @@ inclusion: always
 ```
 cloudsec-ai/
 ├── terraform/
-│   ├── backend/                  # T01-02: S3 bucket + DynamoDB state lock table
+│   ├── backend/                  # T01-02: S3 bucket for remote backend state + local provider lockfile
 │   ├── modules/
 │   │   ├── eventbridge/          # Event bus + rules (per environment)
 │   │   ├── lambdas/              # Lambda deployment package modules

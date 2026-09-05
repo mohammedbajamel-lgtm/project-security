@@ -1,0 +1,18 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["incident_id", "summary", "confidence_score", "attack_stage", "mitre_attack_techniques", "affected_principals", "affected_resources", "evidence_citations", "timeline_summary", "recommended_actions"],
+  "properties": {
+    "incident_id": {"type": "string", "maxLength": 64},
+    "summary": {"type": "string", "maxLength": 2000},
+    "confidence_score": {"type": "number", "minimum": 0, "maximum": 1},
+    "attack_stage": {"enum": ["reconnaissance", "initial_access", "credential_access", "privilege_escalation", "defense_evasion", "persistence", "lateral_movement", "collection", "command_and_control", "exfiltration", "impact"]},
+    "mitre_attack_techniques": {"type": "array", "maxItems": 10, "items": {"type": "string", "pattern": "^T[0-9]{4}(\\.[0-9]{3})?$"}},
+    "affected_principals": {"type": "array", "maxItems": 10, "items": {"type": "object", "additionalProperties": false, "required": ["arn"], "properties": {"arn": {"type": "string", "maxLength": 2048}}}},
+    "affected_resources": {"type": "array", "maxItems": 20, "items": {"type": "object", "additionalProperties": false, "required": ["arn"], "properties": {"arn": {"type": "string", "maxLength": 2048}}}},
+    "evidence_citations": {"type": "array", "minItems": 1, "maxItems": 20, "items": {"type": "object", "additionalProperties": false, "required": ["evidence_id", "quote"], "properties": {"evidence_id": {"type": "string", "maxLength": 64}, "quote": {"type": "string", "maxLength": 500}}}},
+    "timeline_summary": {"type": "string", "maxLength": 2000},
+    "recommended_actions": {"type": "array", "maxItems": 5, "items": {"type": "object", "additionalProperties": false, "required": ["action", "severity", "rationale", "params", "confidence"], "properties": {"action": {"type": "string"}, "severity": {"enum": ["P1", "P2", "P3", "P4"]}, "rationale": {"type": "string"}, "params": {"type": "object"}, "confidence": {"type": "number", "minimum": 0, "maximum": 1}}}}
+  }
+}

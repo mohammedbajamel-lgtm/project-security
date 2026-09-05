@@ -1,0 +1,63 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudsec-ai.internal/schemas/remediation-event.json",
+  "title": "Remediation Events",
+  "description": "Events for remediation lifecycle: RemediationExecuted, RemediationVerified, RemediationFailed.",
+  "$defs": {
+    "RemediationExecuted": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "incident_id", "run_id", "playbook_name", "executed_at"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "RemediationExecuted"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "incident_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "run_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "playbook_name": {"type": "string", "enum": [
+          "iam-credential-compromise",
+          "security-group-open",
+          "s3-public-bucket",
+          "compromised-ec2",
+          "cloudtrail-tampering",
+          "iam-privilege-escalation"
+        ]},
+        "executed_at": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "steps": {"type": "array", "items": {"type": "object"}}
+      }
+    },
+    "RemediationVerified": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "incident_id", "run_id", "verified_at"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "RemediationVerified"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "incident_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "run_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "verified_at": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "checks_passed": {"type": "integer", "minimum": 0},
+        "checks_failed": {"type": "integer", "minimum": 0}
+      }
+    },
+    "RemediationFailed": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "incident_id", "run_id", "failed_at", "error_code"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "RemediationFailed"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "incident_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "run_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "failed_at": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "error_code": {"type": "string"},
+        "error_message": {"type": "string"}
+      }
+    }
+  }
+}

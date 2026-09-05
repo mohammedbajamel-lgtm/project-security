@@ -1,0 +1,10 @@
+variable "env_code" { type = string }
+variable "account_id" { type = string }
+variable "enable_object_lock" { type = bool }
+variable "retention_days" { type = number }
+variable "tags" { type = map(string) }
+variable "source_dir" { type = string }
+variable "ingestion_role_arn" { type = string }
+variable "findings_table_name" { type = string }
+variable "security_bus_name" { type = string }
+variable "dlq_url" { type = string }

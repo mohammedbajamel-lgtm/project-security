@@ -1,0 +1,55 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudsec-ai.internal/schemas/investigation-event.json",
+  "title": "Investigation Events",
+  "description": "Events emitted when the AI investigation engine starts or completes.",
+  "$defs": {
+    "InvestigationStarted": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "incident_id", "started_at", "model"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "InvestigationStarted"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "incident_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "started_at": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "model": {"type": "string", "description": "Bedrock model identifier"},
+        "run_id": {"$ref": "./common-types.json#/$defs/Uuid"}
+      }
+    },
+    "InvestigationCompleted": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "incident_id", "run_id", "completed_at"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "InvestigationCompleted"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "incident_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "run_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "completed_at": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "recommendations": {"type": "array", "items": {"type": "object"}, "minItems": 0},
+        "confidence": {"type": "number", "minimum": 0, "maximum": 1}
+      }
+    },
+    "InvestigationFailed": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "incident_id", "run_id", "failed_at", "error_code"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "InvestigationFailed"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "incident_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "run_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "failed_at": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "error_code": {"type": "string", "minLength": 1},
+        "error_message": {"type": "string"}
+      }
+    }
+  }
+}

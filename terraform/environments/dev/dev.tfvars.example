@@ -1,28 +1,25 @@
-# ====================
-# CloudSec AI — Dev Environment
-# ====================
-# Copy this file to dev.tfvars and fill in real values.
-# NEVER commit dev.tfvars with real secrets.
+# CloudSec AI - Dev Environment Variables (example)
+# Copy to dev.tfvars and fill in real values. dev.tfvars is gitignored.
 
-environment        = "dev"
-account_id         = "<DEV_ACCOUNT_ID>"
-security_account_id = "<SECURITY_ACCOUNT_ID>"
-region             = "us-east-1"
+environment = "dev"
+region      = "us-east-1"
+cost_center = "security"
 
-# Cross-account role ARNs
-read_role_arn         = "arn:aws:iam::<WORKLOAD_ACCOUNT_ID>:role/CloudSecAI-ReadRole"
-remediation_role_arn  = "arn:aws:iam::<WORKLOAD_ACCOUNT_ID>:role/CloudSecAI-RemediationRole"
+# ---- Account IDs ----
+# For single-account dev, security_account_id = workload_account_id.
+security_account_id = "<YOUR_ACCOUNT_ID>"
+workload_account_id = "<YOUR_ACCOUNT_ID>"
 
-# Tags
-project      = "cloudsec-ai"
-managed_by   = "terraform"
-cost_center  = "security"
+# ---- Provider assume-role ----
+# MUST be an IAM role ARN (not an IAM user ARN). Regex-validated in
+# environments/common/variables.tf.
+security_account_role_arn = "arn:aws:iam::<YOUR_ACCOUNT_ID>:role/cloudsec-dev-terraform-deploy"
+workload_account_role_arn = "arn:aws:iam::<YOUR_ACCOUNT_ID>:role/cloudsec-dev-terraform-deploy"
 
-# Evidence bucket
-evidence_bucket_object_lock = false   # Set true only in prod
+# ---- Principals allowed to assume CloudSec AI roles ----
+allowed_terraform_principal_arn     = "arn:aws:iam::<YOUR_ACCOUNT_ID>:user/<YOUR_DEV_USER>"
+allowed_security_admin_principal_arn = "arn:aws:iam::<YOUR_ACCOUNT_ID>:user/<YOUR_DEV_USER>"
 
-# Budget (monthly, USD)
-budget_monthly_limit = 100.0
-
-# Approval (human-in-the-loop)
-approval_sns_topic_arn = "arn:aws:sns:<REGION>:<SECURITY_ACCOUNT_ID>:cloudsec-dev-escalations"
+# ---- Project ----
+project_name = "cloudsec-ai"
+created_by   = "cloudsec-platform"

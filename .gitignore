@@ -2,10 +2,20 @@
 # Terraform
 # ====================
 .terraform/
-.terraform.lock.hcl
+.terraform-*/
 *.tfstate
 *.tfstate.*.backup
 *.tfstate.backup
+*.tfplan
+*.binary
+tfplan*
+*.plan.json
+terraform/plan.json
+terraform/plan.txt
+**/*.tfvars
+**/backend.hcl
+.portfolio-private/
+*.full-backup-*
 crash.log
 crash.*.log
 
@@ -19,7 +29,6 @@ crash.*.log
 *.crt
 secrets/
 credentials/
-*.tfvars          # Real tfvars with secrets — keep only *.tfvars.example
 
 # ====================
 # Python
@@ -45,8 +54,10 @@ wheels/
 .installed.cfg
 *.egg
 .pytest_cache/
+.venv/
 .coverage
 htmlcov/
+reports/
 .tox/
 .mypy_cache/
 .ruff_cache/
@@ -66,7 +77,6 @@ Thumbs.db
 # OS / System
 # ====================
 .DS_Store
-.gitkeep
 
 # ====================
 # AWS CLI

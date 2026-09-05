@@ -1,0 +1,32 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://cloudsec-ai.internal/schemas/finding-event.json",
+  "title": "FindingIngested Event",
+  "description": "Emitted by ingestion Lambdas when a normalized security finding is written to the findings table.",
+  "type": "object",
+  "$ref": "#/$defs/FindingIngested",
+  "$defs": {
+    "FindingIngested": {
+      "type": "object",
+      "required": ["schema_version", "event_id", "event_type", "timestamp", "source_account", "source_region", "source_type", "finding_id", "finding_time", "severity"],
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {"$ref": "./common-types.json#/$defs/SchemaVersion"},
+        "event_id": {"$ref": "./common-types.json#/$defs/Uuid"},
+        "event_type": {"const": "FindingIngested"},
+        "timestamp": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "source_account": {"$ref": "./common-types.json#/$defs/AccountId"},
+        "source_region": {"type": "string", "pattern": "^[a-z]{2}-(?:[a-z]+-){1,2}[0-9]$"},
+        "source_type": {"$ref": "./common-types.json#/$defs/FindingSource"},
+        "finding_id": {"type": "string", "minLength": 8, "maxLength": 128},
+        "finding_time": {"$ref": "./common-types.json#/$defs/Timestamp"},
+        "severity": {"$ref": "./common-types.json#/$defs/Severity"},
+        "principal_arn": {"$ref": "./common-types.json#/$defs/Arn", "nullable": true, "default": null},
+        "resource_arn": {"$ref": "./common-types.json#/$defs/Arn", "nullable": true, "default": null},
+        "source_ip": {"$ref": "./common-types.json#/$defs/IpAddress", "nullable": true, "default": null},
+        "service": {"type": "string", "description": "AWS service that produced the finding (e.g. ec2, iam, s3)"},
+        "details": {"type": "object", "additionalProperties": true, "description": "Free-form finding-specific details (service_name, action, etc.)"}
+      }
+    }
+  }
+}
