@@ -120,6 +120,9 @@ class Recorder:
     def __init__(self):
         self.calls = []
 
+    def put_metric_data(self, **kwargs):
+        self.calls.append(kwargs)
+
     def update_item(self, **kwargs):
         self.calls.append(kwargs)
 
@@ -131,6 +134,7 @@ class Recorder:
 
 
 def test_resolution_requires_every_condition_and_failure_escalates():
+    metrics = Recorder()
     incident = {
         "incident_id": "i",
         "event_time": "2026-09-04T11:00:00+00:00",
@@ -144,16 +148,17 @@ def test_resolution_requires_every_condition_and_failure_escalates():
         "no_new_findings": True,
     }
     assert (
-        resolve_or_escalate(table, events, sns, incident, passed, topic_arn="topic", now=NOW)[
-            "status"
-        ]
+        resolve_or_escalate(
+            table, events, sns, incident, passed, topic_arn="topic", metrics=metrics, now=NOW
+        )["status"]
         == "RESOLVED"
     )
     failed = {**passed, "no_new_findings": False}
     assert (
-        resolve_or_escalate(table, events, sns, incident, failed, topic_arn="topic", now=NOW)[
-            "status"
-        ]
+        resolve_or_escalate(
+            table, events, sns, incident, failed, topic_arn="topic", metrics=metrics, now=NOW
+        )["status"]
         == "ESCALATED"
     )
     assert sns.calls
+    assert metrics.calls

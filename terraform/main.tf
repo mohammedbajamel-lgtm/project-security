@@ -137,6 +137,7 @@ module "safety_policy" {
   source              = "./modules/safety-policy"
   env_code            = local.env_code
   security_account_id = var.security_account_id
+  encryption_key_arn  = module.kms.evidence_key_arn
   policy_path         = "${path.root}/../docs/approved-action-policy.json"
   tags                = local.common_tags
 }

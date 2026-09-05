@@ -67,13 +67,12 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: Run tfsec
-        uses: aquasecurity/tfsec-action@v1
+        uses: aquasecurity/tfsec-action@b466648d6e39e7c75324f25d83891162a721f2d6 # v1.0.3
         with:
           working_directory: terraform
-          severity: CRITICAL,HIGH
-          output_format: sarif
-          output_file: tfsec.sarif
-          fail_on_critical: true
+          format: sarif
+          additional_args: --minimum-severity HIGH --out tfsec.sarif
+          github_token: ${{ github.token }}
 
       - name: Upload tfsec results
         if: always()

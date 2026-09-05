@@ -75,7 +75,11 @@ data "aws_iam_policy_document" "lambda" {
   statement {
     sid = "UseIncidentTableKey"
     actions = [
-      "kms:Decrypt", "kms:Encrypt", "kms:GenerateDataKey*", "kms:DescribeKey"
+      "kms:Decrypt",
+      "kms:Encrypt",
+      "kms:GenerateDataKey",
+      "kms:GenerateDataKeyWithoutPlaintext",
+      "kms:DescribeKey",
     ]
     resources = [var.incident_key_arn]
   }

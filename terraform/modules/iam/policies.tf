@@ -326,6 +326,8 @@ data "aws_iam_policy_document" "remediation_policy" {
       "arn:aws:iam::${var.security_account_id}:policy/cloudsec-*",
     ]
   }
+  # Remediation is intentionally limited to project-owned cloudsec-* buckets.
+  #tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid = "S3PublicAccessContainment"
     actions = [
@@ -439,6 +441,8 @@ data "aws_iam_policy_document" "verification_policy" {
       "arn:aws:iam::${var.security_account_id}:role/cloudsec-*",
     ]
   }
+  # Verification is intentionally limited to project-owned cloudsec-* buckets.
+  #tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid = "GetBucketPolicy"
     actions = [
@@ -447,6 +451,8 @@ data "aws_iam_policy_document" "verification_policy" {
     ]
     resources = ["arn:aws:s3:::cloudsec-*"]
   }
+  # CloudTrail status and lookup APIs require Resource = "*".
+  #tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid       = "GetCloudTrailStatus"
     actions   = ["cloudtrail:GetTrailStatus", "cloudtrail:LookupEvents"]
@@ -454,6 +460,8 @@ data "aws_iam_policy_document" "verification_policy" {
     # cloudtrail:GetTrailStatus does not support resource-level permissions
     # when called against trails; documented exception.
   }
+  # These read-only service APIs do not consistently support resource ARNs.
+  #tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid = "DescribeRemediatedResources"
     actions = [
@@ -597,6 +605,8 @@ data "aws_iam_policy_document" "recovery_policy" {
     ]
     resources = [var.dlq_arn]
   }
+  # sqs:GetQueueUrl requires Resource = "*"; queue access remains ARN-scoped above.
+  #tfsec:ignore:aws-iam-no-policy-wildcards
   statement {
     sid       = "DescribeDLQ"
     actions   = ["sqs:GetQueueUrl"]

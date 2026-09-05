@@ -29,6 +29,8 @@ resource "aws_s3_bucket_public_access_block" "access_logs" {
   ignore_public_acls      = true
   restrict_public_buckets = true
 }
+# S3 server-access-log destination buckets support SSE-S3, not SSE-KMS.
+#tfsec:ignore:aws-s3-encryption-customer-key
 resource "aws_s3_bucket_server_side_encryption_configuration" "access_logs" {
   bucket = aws_s3_bucket.access_logs.id
   rule {
