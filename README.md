@@ -116,12 +116,10 @@ See the complete, annotated [evidence gallery](docs/evidence.md). Screenshots ar
 
 ```text
 terraform/          infrastructure and environment configuration
-lambda/             Python Lambda packages
+lambda/             Lambda packages, remediation playbooks, and shared code
 schemas/            platform event and report schemas
-playbooks/          remediation definitions
-tests/              unit, integration, Terraform, and opt-in end-to-end tests
-attack-simulations/ safe synthetic payloads
-lab/                isolated lab fixtures and simulations
+tests/              unit, Terraform, and opt-in end-to-end tests
+lab/simulations/    isolated synthetic security-event simulations
 scripts/            deployment, verification, demo, and cleanup helpers
 docs/               architecture, security, evidence, and operations guides
 ```

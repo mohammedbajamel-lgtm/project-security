@@ -1,30 +1,16 @@
 # CloudSec AI - Root Terraform Composition
 #
-# Entry point for the main CloudSec AI platform. Wires together sub-modules
-# and composes their outputs. The bootstrap (terraform/backend/) is applied
-# separately and is NOT included here.
-#
-# Phase 1 modules wired here now:
-#   * kms              - 4 customer-managed KMS keys (T01-06)
-#   * iam              - 10 IAM roles + scoped policies (T01-07)
-#   * cost_controls    - budget + SNS alerts (T01-08)
-#
-# Phase 2 modules (wired in T02-* tasks):
-#   * dynamodb (incidents + findings tables, T02-01 + T02-02)
-#   * eventbridge_bus  (custom security event bus, T02-03)
-#   * sqs_dlq          (DLQ for failed event processing, T02-04)
-#   * sns_notifications (incident/escalation/error topics, T02-07)
-#   * eventbridge_rules (routing rules on the security bus, T02-08)
-#
-# Phase 2 modules are NOT wired yet — they will be added after Phase 2 is
-# implemented locally and reviewed. Placeholder comments below.
+# Entry point for the complete CloudSec AI platform. It composes encryption,
+# IAM, cost controls, data stores, event routing, telemetry ingestion,
+# investigation, approval, remediation, verification, evidence, reporting,
+# observability, and optional isolated-lab controls. The protected remote-state
+# bucket is bootstrapped separately from terraform/backend/.
 #
 # Known design decisions:
 #   * KMS ↔ IAM mutual dependency resolved by passing module outputs within
 #     a single apply. Terraform resolves intra-apply references.
-#   * IAM policies reference pre-declared ARNs for Phase-2 resources
-#     (DynamoDB, SQS, SNS). These resources don't exist yet in dev; the
-#     policies will be in place when the resources are created in Phase 2.
+#   * IAM policies use deterministic ARNs for resources created elsewhere in
+#     this same graph, avoiding dependency cycles while retaining tight scope.
 
 # =====================================================================
 # Terraform block (S3 backend)
@@ -97,8 +83,8 @@ module "iam" {
   allowed_terraform_principals      = [var.allowed_terraform_principal_arn]
   allowed_security_admin_principals = [var.allowed_security_admin_principal_arn]
 
-  # Phase-2 resources that don't exist in Phase 1. Policies will already
-  # be scoped to the correct ARNs when the resources are created in Phase 2.
+  # Deterministic resource ARNs keep IAM permissions scoped without creating
+  # module dependency cycles.
   incidents_table_arn         = "arn:aws:dynamodb:${var.region}:${var.security_account_id}:table/${local.incidents_table_name}"
   findings_table_arn          = "arn:aws:dynamodb:${var.region}:${var.security_account_id}:table/${local.findings_table_name}"
   baselines_table_arn         = "arn:aws:dynamodb:${var.region}:${var.security_account_id}:table/${local.baselines_table_name}"
